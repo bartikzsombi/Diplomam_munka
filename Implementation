@@ -1,0 +1,60 @@
+import random
+import hashlib
+from pypuf.simulation import XORArbiterPUF
+from pypuf.io import random_inputs
+import numpy as np
+import time
+from numpy import median
+if __name__ == '__main__':
+    avgTime = []
+    for i in range(1000):
+        start_time = time.time()
+
+        #random számok
+        Nu= random.randint(1,100)
+        Ns= random.randint(1,100)
+
+        pufx = XORArbiterPUF(n=32, k=2)
+        pufy = XORArbiterPUF(n=32, k=4)
+        challenges = random_inputs(n=32, N=4, seed=2)  # C_i
+        Rx = pufx.eval(challenges)
+        Ry = pufy.eval(challenges)
+        Cpx = hashlib.sha256(challenges.tobytes() + Rx.tobytes()).hexdigest() # C_i+1
+        Cpy = hashlib.sha256(challenges.tobytes() + Ry.tobytes()).hexdigest()  # C_i+1
+
+        seedx = str(bin(int(Cpx,base=16)))[5:15]
+        seedy = str(bin(int(Cpy,base=16)))[5:15]
+
+        challengesX = random_inputs(n=32, N=4, seed=int(seedx))
+        challengesY = random_inputs(n=32, N=4, seed=int(seedy))
+
+        Rpx = pufy.eval(challengesX)
+        Rpy = pufy.eval(challengesY)
+        #random földrajzi koordináták ami az UAV helye
+        LAIu = [47,21]
+        tempEL0 = hashlib.sha256(Rx.tobytes()+bytes(Ns)).hexdigest()
+        tempEL = int(str(bin(int(tempEL0,base=16)))[5:15])
+        EL = np.bitwise_xor(LAIu,tempEL)
+        #UAVnak az azonosítója
+        IDu = random.randint(10000000,99999999)
+        tempRpxx0 = hashlib.sha256(bytes(IDu)+Rx.tobytes()).hexdigest()
+        tempRpyy0 = hashlib.sha256(bytes(IDu)+Ry.tobytes()).hexdigest()
+        tempRpxx = int(str(bin(int(tempRpxx0,base=16)))[5:15])
+        tempRpyy = int(str(bin(int(tempRpyy0,base=16)))[5:15])
+        Rpxx = np.bitwise_xor(tempRpxx,Rpx)
+        Rpyy = np.bitwise_xor(tempRpyy,Rpy)
+
+
+        SK = hashlib.sha256(Rx.tobytes()+Ry.tobytes()+bytes(Nu)+bytes(Ns)).hexdigest()
+        SKres = int(str(bin(int(SK,base=16)))[5:15])
+        #print("SK: " + SK)
+        ResUAV = hashlib.sha256(EL.tobytes()+Rpxx.tobytes()+Rpyy.tobytes()+bytes(SKres)).hexdigest()
+        #print("ResUAV: " + ResUAV)
+        avgTime.append(time.time() - start_time)
+
+
+    print("--- %s másodperc --- (A leggyorsabb futási idő)" % (min(avgTime)))
+    print("--- %s másodperc --- (A leglassabb futási idő)" % (max(avgTime)))
+    print("--- %s másodperc --- (A futási idők mediánja)" % (median(sorted(avgTime))))
+    print("--- %s másodperc --- (A futási idők átlaga)" % (sum(avgTime) / len(avgTime)))
+    print("--- %s másodperc --- (1000 futtatás ideje összesen)" % (sum(avgTime)))
