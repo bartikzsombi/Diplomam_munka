@@ -7,15 +7,25 @@ import time
 from numpy import median
 if __name__ == '__main__':
     avgTime = []
+    XORArbiterTime = []
+    randomTime = []
+    evalTime = []
+    bitwiseTime = []
+    SKshaTime = []
+    RESUAVshaTime = []
     for i in range(1000):
         start_time = time.time()
 
-        #random számok
-        Nu= random.randint(1,100)
-        Ns= random.randint(1,100)
+        #random számok - most max 7 számjegy
+        Nu= random.randint(1000000,9999999)
+        Ns= random.randint(1000000,9999999)
 
+        XORArbiter_time = time.time()
         pufx = XORArbiterPUF(n=32, k=2)
         pufy = XORArbiterPUF(n=32, k=4)
+        XORArbiter_time = time.time()-XORArbiter_time
+        XORArbiterTime.append(XORArbiter_time)
+
         challenges = random_inputs(n=32, N=4, seed=2)  # C_i
         Rx = pufx.eval(challenges)
         Ry = pufy.eval(challenges)
@@ -25,15 +35,22 @@ if __name__ == '__main__':
         seedx = str(bin(int(Cpx,base=16)))[5:15]
         seedy = str(bin(int(Cpy,base=16)))[5:15]
 
+        random_time = time.time()
         challengesX = random_inputs(n=32, N=4, seed=int(seedx))
         challengesY = random_inputs(n=32, N=4, seed=int(seedy))
+        random_time = time.time() - random_time
+        randomTime.append(random_time)
 
+        eval_time = time.time()
         Rpx = pufy.eval(challengesX)
         Rpy = pufy.eval(challengesY)
+        eval_time = time.time() - eval_time
+        evalTime.append(eval_time)
+
         #random földrajzi koordináták ami az UAV helye
         LAIu = [47,21]
         tempEL0 = hashlib.sha256(Rx.tobytes()+bytes(Ns)).hexdigest()
-        tempEL = int(str(bin(int(tempEL0,base=16)))[5:15])
+        tempEL = int(str(bin(int(tempEL0,base=16)))[8:15])
         EL = np.bitwise_xor(LAIu,tempEL)
         #UAVnak az azonosítója
         IDu = random.randint(10000000,99999999)
@@ -41,20 +58,38 @@ if __name__ == '__main__':
         tempRpyy0 = hashlib.sha256(bytes(IDu)+Ry.tobytes()).hexdigest()
         tempRpxx = int(str(bin(int(tempRpxx0,base=16)))[5:15])
         tempRpyy = int(str(bin(int(tempRpyy0,base=16)))[5:15])
+
+        bitwise_time = time.time()
         Rpxx = np.bitwise_xor(tempRpxx,Rpx)
         Rpyy = np.bitwise_xor(tempRpyy,Rpy)
+        bitwise_time = time.time() - bitwise_time
+        bitwiseTime.append(bitwise_time)
 
-
+        SKsha_time= time.time()
         SK = hashlib.sha256(Rx.tobytes()+Ry.tobytes()+bytes(Nu)+bytes(Ns)).hexdigest()
-        SKres = int(str(bin(int(SK,base=16)))[5:15])
+        SKsha_time= time.time() - SKsha_time
+        SKshaTime.append(SKsha_time)
+
+        SKres = int(str(bin(int(SK,base=16)))[8:15])
         #print("SK: " + SK)
+
+        RESUAVsha_time= time.time()
         ResUAV = hashlib.sha256(EL.tobytes()+Rpxx.tobytes()+Rpyy.tobytes()+bytes(SKres)).hexdigest()
+        RESUAVsha_time= time.time() - RESUAVsha_time
+        RESUAVshaTime.append(RESUAVsha_time)
+
         #print("ResUAV: " + ResUAV)
         avgTime.append(time.time() - start_time)
+
+    print( "%s XORArbiterPUF     " % (sum(XORArbiterTime ) / len(XORArbiterTime)))
+    print( "%s random_inputs     " % (sum(randomTime ) / len(randomTime)))
+    print( "%s eval              " % (sum(evalTime ) / len(evalTime)))
+    print( "%s bitwiseXOR        " % (sum(bitwiseTime ) / len(bitwiseTime)))
+    print( "%s SK                " % (sum(SKshaTime ) / len(SKshaTime)))
+    print("%s RESUAV             " % (sum(RESUAVshaTime ) / len(RESUAVshaTime) ))
 
 
     print("--- %s másodperc --- (A leggyorsabb futási idő)" % (min(avgTime)))
     print("--- %s másodperc --- (A leglassabb futási idő)" % (max(avgTime)))
     print("--- %s másodperc --- (A futási idők mediánja)" % (median(sorted(avgTime))))
     print("--- %s másodperc --- (A futási idők átlaga)" % (sum(avgTime) / len(avgTime)))
-    print("--- %s másodperc --- (1000 futtatás ideje összesen)" % (sum(avgTime)))
